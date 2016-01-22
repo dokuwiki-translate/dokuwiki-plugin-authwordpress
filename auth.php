@@ -126,7 +126,9 @@ class auth_plugin_authwordpress extends DokuWiki_Auth_Plugin {
 	 */
 	public function retrieveUsers($start = 0, $limit = 0, $filter = array()) {
 		msg($this->getLang('user_list_use_wordpress'));
-
+		if($filter) {
+			msg($this->getLang('error_filters_unsupported'));
+		}
 		$this->cacheAllUsers();
 		return $this->users;
 	}
