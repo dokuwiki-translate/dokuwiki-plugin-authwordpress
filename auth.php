@@ -52,6 +52,17 @@ class auth_plugin_authwordpress extends DokuWiki_Auth_Plugin {
 	 */
 	private $db;
 
+	/**
+	 * Users cache
+	 */
+	protected $users;
+
+	/**
+	 * True if all users have been loaded in the cache
+	 * @see $users
+	 */
+	protected $usersCached = false;
+
 
 	/**
 	 * Constructor.
@@ -114,16 +125,10 @@ class auth_plugin_authwordpress extends DokuWiki_Auth_Plugin {
 	 * @return  array userinfo (refer getUserData for internal userinfo details)
 	 */
 	public function retrieveUsers($start = 0, $limit = 0, $filter = array()) {
-		$stmt = $this->db->prepare($this->sql_wp_user_data);
-		$stmt->execute();
-
-		$users = array();
-		foreach($stmt->fetchAll(PDO::FETCH_ASSOC) as $user) {
-			$users[] = $this->wp2dw($user);
-		}
-
 		msg($this->getLang('user_list_use_wordpress'));
-		return $users;
+
+		$this->cacheAllUsers();
+		return $this->users;
 	}
 
 
@@ -134,6 +139,10 @@ class auth_plugin_authwordpress extends DokuWiki_Auth_Plugin {
 	 * @return  array containing user data or false
 	 */
 	public function getUserData($user, $requireGroups=true) {
+		if(isset($this->users[$user])) {
+			return $this->users[$user];
+		}
+
 		$sql = $this->sql_wp_user_data
 			. 'WHERE user_login = :user';
 
@@ -155,7 +164,7 @@ class auth_plugin_authwordpress extends DokuWiki_Auth_Plugin {
 			return false;
 		}
 
-		return $this->wp2dw($user);
+		return $this->cacheUser($user);
 	}
 
 
@@ -185,27 +194,57 @@ class auth_plugin_authwordpress extends DokuWiki_Auth_Plugin {
 
 	/**
 	 * Convert a Wordpress DB User row to DokuWiki user info array
+	 * and stores it in the users cache
 	 *
 	 * @param  array $user Raw Wordpress user table row
 	 * @return array user data
 	 */
-	protected function wp2dw($user) {
+	protected function cacheUser($row) {
 		global $conf;
 
+		$login = $row['user_login'];
+
+		// If the user is already cached, just return it
+		if(isset($this->users[$login])) {
+			return $this->users[$login];
+		}
+
 		// Group membership - add DokuWiki's default group
-		$groups = array_keys(unserialize($user['groups']));
+		$groups = array_keys(unserialize($row['groups']));
 		if($this->getConf('usedefaultgroup')) {
 			$groups[] = $conf['defaultgroup'];
 		}
 
 		$info = array(
-			'user' => $user['user_login'],
-			'name' => $user['display_name'],
-			'pass' => $user['user_pass'],
-			'mail' => $user['user_email'],
+			'user' => $login,
+			'name' => $row['display_name'],
+			'pass' => $row['user_pass'],
+			'mail' => $row['user_email'],
 			'grps' => $groups,
 		);
+
+		$this->users[$login] = $info;
 		return $info;
+	}
+
+	/**
+	 * Loads all Wordpress users into the cache
+	 *
+	 * @return void
+	 */
+	protected function cacheAllUsers() {
+		if($this->usersCached) {
+			return;
+		}
+
+		$stmt = $this->db->prepare($this->sql_wp_user_data);
+		$stmt->execute();
+
+		foreach($stmt->fetchAll(PDO::FETCH_ASSOC) as $user) {
+			$this->cacheUser($user);
+		}
+
+		$this->usersCached = true;
 	}
 
 }
