@@ -127,7 +127,7 @@ class auth_plugin_authwordpress extends DokuWiki_Auth_Plugin {
 	 * @param   string $user the user name
 	 * @return  array containing user data or false
 	 */
-	function getUserData($user, $requireGroups=true) {
+	public function getUserData($user, $requireGroups=true) {
 		global $conf;
 
 		$stmt = $this->db->prepare($this->sql_wp_user_data);
@@ -169,7 +169,6 @@ class auth_plugin_authwordpress extends DokuWiki_Auth_Plugin {
 	 * Connect to Wordpress database
 	 * Initializes $db property as PDO object
 	 */
-	private function wp_connect() {
 		$dsn = array(
 			'host=' . $this->getConf('hostname'),
 			'dbname=' . $this->getConf('database'),
